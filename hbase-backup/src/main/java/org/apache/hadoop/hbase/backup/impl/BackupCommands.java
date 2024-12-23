@@ -715,8 +715,7 @@ public final class BackupCommands {
       String[] backupIds = sysTable.getListOfBackupIdsFromDeleteOperation();
       if (backupIds == null || backupIds.length == 0) {
         System.out.println("No failed backup DELETE operation found");
-        // Delete backup table snapshot if exists
-        BackupSystemTable.deleteSnapshot(conn);
+        // Don't delete snapshot here - let merge repair handle it
         return;
       }
       System.out.println("Found failed DELETE operation for: " + StringUtils.join(backupIds));
@@ -737,8 +736,8 @@ public final class BackupCommands {
       String[] backupIds = sysTable.getListOfBackupIdsFromMergeOperation();
       if (backupIds == null || backupIds.length == 0) {
         System.out.println("No failed backup MERGE operation found");
-        // Delete backup table snapshot if exists
-        BackupSystemTable.deleteSnapshot(conn);
+        // Only delete snapshot if no repairs were needed
+        BackupSystemTable.deleteSnapshot(conn); 
         return;
       }
       System.out.println("Found failed MERGE operation for: " + StringUtils.join(backupIds));
@@ -757,7 +756,7 @@ public final class BackupCommands {
         boolean res = fs.rename(tmpPath, destPath);
         if (!res) {
           throw new IOException(
-            "MERGE repair: failed  to rename from " + tmpPath + " to " + destPath);
+            "MERGE repair: failed to rename from " + tmpPath + " to " + destPath);
         }
         System.out
           .println("MERGE repair: renamed from " + tmpPath + " to " + destPath + " res=" + res);
@@ -770,6 +769,8 @@ public final class BackupCommands {
       sysTable.finishBackupExclusiveOperation();
       // Finish previous failed session
       sysTable.finishMergeOperation();
+      // Delete snapshot after successful repair
+      BackupSystemTable.deleteSnapshot(conn);
 
       System.out.println("MERGE repair operation finished OK: " + StringUtils.join(backupIds));
     }

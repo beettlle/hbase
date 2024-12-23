@@ -34,6 +34,7 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hbase.util.StringUtils;
 
 @Category(LargeTests.class)
 public class TestBackupRepair extends TestBackupBase {
@@ -86,6 +87,92 @@ public class TestBackupRepair extends TestBackupBase {
       }
       Set<TableName> tables = table.getIncrementalBackupTableSet(BACKUP_ROOT_DIR);
       assertTrue(tables.size() == 0);
+    }
+  }
+
+  @Test
+  public void testRepairSnapshotHandlingDuringDelete() throws Exception {
+    // Create test tables and backup data
+    TableName[] tables = new TableName[] { table1, table2 };
+    String backupId = backupTables(tables);
+    
+    try (BackupSystemTable systemTable = new BackupSystemTable(TEST_UTIL.getConnection())) {
+      // Simulate failed delete operation
+      systemTable.startBackupExclusiveOperation(backupId);
+      BackupSystemTable.createSnapshot(TEST_UTIL.getConnection());
+      
+      // Run repair
+      String[] args = new String[] { "repair" };
+      int ret = ToolRunner.run(conf1, new BackupDriver(), args);
+      assertTrue(ret == 0);
+      
+      // Verify snapshot was not deleted after delete repair
+      assertTrue("Snapshot should exist after delete repair",
+        BackupSystemTable.snapshotExists(TEST_UTIL.getConnection()));
+      
+      // Verify backup system table is consistent
+      assertFalse("Backup exclusive operation should be finished",
+        systemTable.hasOngoingExclusiveOperation());
+    }
+  }
+
+  @Test
+  public void testRepairSnapshotHandlingDuringMerge() throws Exception {
+    // Create test tables and backup data
+    TableName[] tables = new TableName[] { table1, table2 };
+    String backupId1 = backupTables(tables);
+    String backupId2 = backupTables(tables);
+    
+    try (BackupSystemTable systemTable = new BackupSystemTable(TEST_UTIL.getConnection())) {
+      // Simulate failed merge operation
+      systemTable.startBackupExclusiveOperation(backupId1 + "," + backupId2);
+      BackupSystemTable.createSnapshot(TEST_UTIL.getConnection());
+      systemTable.startMergeOperation(new String[] { backupId1, backupId2 });
+      
+      // Run repair
+      String[] args = new String[] { "repair" };
+      int ret = ToolRunner.run(conf1, new BackupDriver(), args);
+      assertTrue(ret == 0);
+      
+      // Verify snapshot was deleted after merge repair
+      assertFalse("Snapshot should be deleted after merge repair",
+        BackupSystemTable.snapshotExists(TEST_UTIL.getConnection()));
+      
+      // Verify backup system table is consistent
+      assertFalse("Backup exclusive operation should be finished",
+        systemTable.hasOngoingExclusiveOperation());
+      assertFalse("Merge operation should be finished",
+        systemTable.hasOngoingMergeOperation());
+    }
+  }
+
+  @Test
+  public void testRepairSnapshotHandlingWithNoFailures() throws Exception {
+    try (BackupSystemTable systemTable = new BackupSystemTable(TEST_UTIL.getConnection())) {
+      // Create snapshot
+      BackupSystemTable.createSnapshot(TEST_UTIL.getConnection());
+      
+      // Run repair with no failures
+      String[] args = new String[] { "repair" };
+      int ret = ToolRunner.run(conf1, new BackupDriver(), args);
+      assertTrue(ret == 0);
+      
+      // Verify snapshot was deleted when no repairs needed
+      assertFalse("Snapshot should be deleted when no repairs needed",
+        BackupSystemTable.snapshotExists(TEST_UTIL.getConnection()));
+    }
+  }
+
+  // Helper method to create backup
+  private String backupTables(TableName[] tables) throws Exception {
+    String[] args = new String[] { "create", "full", BACKUP_ROOT_DIR, "-t",
+      StringUtils.join(tables, ",") };
+    int ret = ToolRunner.run(conf1, new BackupDriver(), args);
+    assertTrue(ret == 0);
+    
+    try (BackupSystemTable systemTable = new BackupSystemTable(TEST_UTIL.getConnection())) {
+      List<BackupInfo> backups = systemTable.getBackupHistory();
+      return backups.get(backups.size() - 1).getBackupId();
     }
   }
 
