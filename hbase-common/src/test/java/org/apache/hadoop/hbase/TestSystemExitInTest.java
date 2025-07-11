@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase;
 
 import org.apache.hadoop.hbase.testclassification.MiscTests;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
+import org.apache.hadoop.hbase.util.ExitHandler;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -30,9 +31,9 @@ public class TestSystemExitInTest {
   public static final HBaseClassTestRule CLASS_RULE =
     HBaseClassTestRule.forClass(TestSystemExitInTest.class);
 
-  @Test(expected = SystemExitRule.SystemExitInTestException.class)
+  @Test(expected = SecurityException.class)
   public void testSystemExit() {
-    System.exit(1);
+    ExitHandler.getInstance().exit(1);
   }
 
 }

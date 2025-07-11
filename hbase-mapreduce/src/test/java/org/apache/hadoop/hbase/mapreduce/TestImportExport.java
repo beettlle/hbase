@@ -86,7 +86,7 @@ import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.testclassification.VerySlowMapReduceTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.hadoop.hbase.util.LauncherSecurityManager;
+import org.apache.hadoop.hbase.util.LauncherExitHandler;
 import org.apache.hadoop.hbase.util.MapReduceExtendedCell;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALEdit;
@@ -571,26 +571,28 @@ public class TestImportExport {
   @Test
   public void testImportMain() throws Throwable {
     PrintStream oldPrintStream = System.err;
-    SecurityManager SECURITY_MANAGER = System.getSecurityManager();
-    LauncherSecurityManager newSecurityManager = new LauncherSecurityManager();
-    System.setSecurityManager(newSecurityManager);
+    LauncherExitHandler exitHandler = new LauncherExitHandler();
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     String[] args = {};
     System.setErr(new PrintStream(data));
     try {
       System.setErr(new PrintStream(data));
-      Import.main(args);
-      fail("should be SecurityException");
-    } catch (SecurityException e) {
-      assertEquals(-1, newSecurityManager.getExitCode());
-      assertTrue(data.toString().contains("Wrong number of arguments:"));
-      assertTrue(data.toString().contains("-Dimport.bulk.output=/path/for/output"));
-      assertTrue(data.toString().contains("-Dimport.filter.class=<name of filter class>"));
-      assertTrue(data.toString().contains("-Dimport.bulk.output=/path/for/output"));
-      assertTrue(data.toString().contains("-Dmapreduce.reduce.speculative=false"));
+      try {
+        exitHandler.install();
+        Import.main(args);
+        fail("should be SecurityException");
+      } catch (SecurityException e) {
+        assertEquals(-1, exitHandler.getExitCode());
+        assertTrue(data.toString().contains("Wrong number of arguments:"));
+        assertTrue(data.toString().contains("-Dimport.bulk.output=/path/for/output"));
+        assertTrue(data.toString().contains("-Dimport.filter.class=<name of filter class>"));
+        assertTrue(data.toString().contains("-Dimport.bulk.output=/path/for/output"));
+        assertTrue(data.toString().contains("-Dmapreduce.reduce.speculative=false"));
+      } finally {
+        exitHandler.restore();
+      }
     } finally {
       System.setErr(oldPrintStream);
-      System.setSecurityManager(SECURITY_MANAGER);
     }
   }
 
@@ -636,31 +638,33 @@ public class TestImportExport {
   @Test
   public void testExportMain() throws Throwable {
     PrintStream oldPrintStream = System.err;
-    SecurityManager SECURITY_MANAGER = System.getSecurityManager();
-    LauncherSecurityManager newSecurityManager = new LauncherSecurityManager();
-    System.setSecurityManager(newSecurityManager);
+    LauncherExitHandler exitHandler = new LauncherExitHandler();
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     String[] args = {};
     System.setErr(new PrintStream(data));
     try {
       System.setErr(new PrintStream(data));
-      runExportMain(args);
-      fail("should be SecurityException");
-    } catch (SecurityException e) {
-      assertEquals(-1, newSecurityManager.getExitCode());
-      String errMsg = data.toString();
-      assertTrue(errMsg.contains("Wrong number of arguments:"));
-      assertTrue(
-        errMsg.contains("Usage: Export [-D <property=value>]* <tablename> <outputdir> [<versions> "
-          + "[<starttime> [<endtime>]] [^[regex pattern] or [Prefix] to filter]]"));
-      assertTrue(errMsg.contains("-D hbase.mapreduce.scan.column.family=<family1>,<family2>, ..."));
-      assertTrue(errMsg.contains("-D hbase.mapreduce.include.deleted.rows=true"));
-      assertTrue(errMsg.contains("-D hbase.client.scanner.caching=100"));
-      assertTrue(errMsg.contains("-D hbase.export.scanner.batch=10"));
-      assertTrue(errMsg.contains("-D hbase.export.scanner.caching=100"));
+      try {
+        exitHandler.install();
+        runExportMain(args);
+        fail("should be SecurityException");
+      } catch (SecurityException e) {
+        assertEquals(-1, exitHandler.getExitCode());
+        String errMsg = data.toString();
+        assertTrue(errMsg.contains("Wrong number of arguments:"));
+        assertTrue(
+          errMsg.contains("Usage: Export [-D <property=value>]* <tablename> <outputdir> [<versions> "
+            + "[<starttime> [<endtime>]] [^[regex pattern] or [Prefix] to filter]]"));
+        assertTrue(errMsg.contains("-D hbase.mapreduce.scan.column.family=<family1>,<family2>, ..."));
+        assertTrue(errMsg.contains("-D hbase.mapreduce.include.deleted.rows=true"));
+        assertTrue(errMsg.contains("-D hbase.client.scanner.caching=100"));
+        assertTrue(errMsg.contains("-D hbase.export.scanner.batch=10"));
+        assertTrue(errMsg.contains("-D hbase.export.scanner.caching=100"));
+      } finally {
+        exitHandler.restore();
+      }
     } finally {
       System.setErr(oldPrintStream);
-      System.setSecurityManager(SECURITY_MANAGER);
     }
   }
 

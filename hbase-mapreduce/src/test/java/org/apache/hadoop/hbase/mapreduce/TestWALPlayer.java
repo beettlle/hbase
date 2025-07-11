@@ -59,7 +59,7 @@ import org.apache.hadoop.hbase.tool.BulkLoadHFiles;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.hadoop.hbase.util.LauncherSecurityManager;
+import org.apache.hadoop.hbase.util.LauncherExitHandler;
 import org.apache.hadoop.hbase.util.MapReduceExtendedCell;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALEdit;
@@ -312,28 +312,28 @@ public class TestWALPlayer {
   public void testMainMethod() throws Exception {
 
     PrintStream oldPrintStream = System.err;
-    SecurityManager SECURITY_MANAGER = System.getSecurityManager();
-    LauncherSecurityManager newSecurityManager = new LauncherSecurityManager();
-    System.setSecurityManager(newSecurityManager);
+    LauncherExitHandler exitHandler = new LauncherExitHandler();
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     String[] args = {};
     System.setErr(new PrintStream(data));
     try {
       System.setErr(new PrintStream(data));
       try {
+        exitHandler.install();
         WALPlayer.main(args);
         fail("should be SecurityException");
       } catch (SecurityException e) {
-        assertEquals(-1, newSecurityManager.getExitCode());
+        assertEquals(-1, exitHandler.getExitCode());
         assertTrue(data.toString().contains("ERROR: Wrong number of arguments:"));
         assertTrue(data.toString()
           .contains("Usage: WALPlayer [options] <WAL inputdir>" + " [<tables> <tableMappings>]"));
         assertTrue(data.toString().contains("-Dwal.bulk.output=/path/for/output"));
+      } finally {
+        exitHandler.restore();
       }
 
     } finally {
       System.setErr(oldPrintStream);
-      System.setSecurityManager(SECURITY_MANAGER);
     }
 
   }

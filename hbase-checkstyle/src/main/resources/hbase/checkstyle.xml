@@ -131,6 +131,13 @@
 
     <!-- Make the @SuppressWarnings annotations available to Checkstyle -->
     <module name="SuppressWarningsHolder"/>
+    
+    <!-- Custom check to detect System.exit calls -->
+    <module name="Regexp">
+      <property name="format" value="System\.exit\("/>
+      <property name="message" value="Use ExitHandler.getInstance().exit() instead of System.exit() to avoid SecurityManager deprecation warnings"/>
+      <property name="illegalPattern" value="true"/>
+    </module>
   </module>
 
   <!-- Size Violation Checks

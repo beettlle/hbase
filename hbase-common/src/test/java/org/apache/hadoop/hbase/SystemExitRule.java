@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase;
 
+import org.apache.hadoop.hbase.util.ExitHandler;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -26,31 +27,29 @@ import org.junit.runners.model.Statement;
 * the JVM - instead an exception is thrown.
 * */
 public class SystemExitRule implements TestRule {
-  final static SecurityManager securityManager = new TestSecurityManager();
 
   @Override
   public Statement apply(final Statement s, Description d) {
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
-
         try {
-          forbidSystemExitCall();
+          // Prevent System.exit calls during test execution
+          ExitHandler.getInstance().preventExit();
           s.evaluate();
         } finally {
-          System.setSecurityManager(null);
+          // Restore normal exit behavior after test
+          ExitHandler.getInstance().allowExit();
         }
       }
-
     };
-  };
+  }
 
   // Exiting the JVM is not allowed in tests and this exception is thrown instead
   // when it is done
   public static class SystemExitInTestException extends SecurityException {
-  }
-
-  private static void forbidSystemExitCall() {
-    System.setSecurityManager(securityManager);
+    public SystemExitInTestException(String message) {
+      super(message);
+    }
   }
 }

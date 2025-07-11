@@ -37,7 +37,7 @@ import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.testclassification.MapReduceTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.hadoop.hbase.util.LauncherSecurityManager;
+import org.apache.hadoop.hbase.util.LauncherExitHandler;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
@@ -472,29 +472,33 @@ public class TestRowCounter {
    */
   @Test
   public void testImportMain() throws Exception {
-    SecurityManager SECURITY_MANAGER = System.getSecurityManager();
-    LauncherSecurityManager newSecurityManager = new LauncherSecurityManager();
-    System.setSecurityManager(newSecurityManager);
+    LauncherExitHandler exitHandler = new LauncherExitHandler();
     String[] args = {};
     try {
       try {
+        exitHandler.install();
         RowCounter.main(args);
         fail("should be SecurityException");
       } catch (SecurityException e) {
-        assertEquals(RowCounter.EXIT_FAILURE, newSecurityManager.getExitCode());
+        assertEquals(RowCounter.EXIT_FAILURE, exitHandler.getExitCode());
+      } finally {
+        exitHandler.restore();
       }
       try {
         args = new String[2];
         args[0] = "table";
         args[1] = "--range=1";
+        exitHandler.install();
         RowCounter.main(args);
         fail("should be SecurityException");
       } catch (SecurityException e) {
-        assertEquals(RowCounter.EXIT_FAILURE, newSecurityManager.getExitCode());
+        assertEquals(RowCounter.EXIT_FAILURE, exitHandler.getExitCode());
+      } finally {
+        exitHandler.restore();
       }
 
     } finally {
-      System.setSecurityManager(SECURITY_MANAGER);
+      // Cleanup handled by finally blocks above
     }
   }
 

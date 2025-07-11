@@ -39,7 +39,7 @@ import org.apache.hadoop.hbase.mapreduce.SampleUploader.Uploader;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.testclassification.MapReduceTests;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.LauncherSecurityManager;
+import org.apache.hadoop.hbase.util.LauncherExitHandler;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -96,9 +96,7 @@ public class TestMapReduceExamples {
   @Test
   public void testMainSampleUploader() throws Exception {
     PrintStream oldPrintStream = System.err;
-    SecurityManager SECURITY_MANAGER = System.getSecurityManager();
-    LauncherSecurityManager newSecurityManager = new LauncherSecurityManager();
-    System.setSecurityManager(newSecurityManager);
+    LauncherExitHandler exitHandler = new LauncherExitHandler();
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     String[] args = {};
     System.setErr(new PrintStream(data));
@@ -106,17 +104,19 @@ public class TestMapReduceExamples {
       System.setErr(new PrintStream(data));
 
       try {
+        exitHandler.install();
         SampleUploader.main(args);
         fail("should be SecurityException");
       } catch (SecurityException e) {
-        assertEquals(-1, newSecurityManager.getExitCode());
+        assertEquals(-1, exitHandler.getExitCode());
         assertTrue(data.toString().contains("Wrong number of arguments:"));
         assertTrue(data.toString().contains("Usage: SampleUploader <input> <tablename>"));
+      } finally {
+        exitHandler.restore();
       }
 
     } finally {
       System.setErr(oldPrintStream);
-      System.setSecurityManager(SECURITY_MANAGER);
     }
 
   }
@@ -163,21 +163,23 @@ public class TestMapReduceExamples {
   @Test
   public void testMainIndexBuilder() throws Exception {
     PrintStream oldPrintStream = System.err;
-    LauncherSecurityManager newSecurityManager = new LauncherSecurityManager();
-    System.setSecurityManager(newSecurityManager);
+    LauncherExitHandler exitHandler = new LauncherExitHandler();
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     String[] args = {};
     System.setErr(new PrintStream(data));
     try {
       System.setErr(new PrintStream(data));
       try {
+        exitHandler.install();
         IndexBuilder.main(args);
         fail("should be SecurityException");
       } catch (SecurityException e) {
-        assertEquals(-1, newSecurityManager.getExitCode());
+        assertEquals(-1, exitHandler.getExitCode());
         assertTrue(data.toString().contains("arguments supplied, required: 3"));
         assertTrue(data.toString()
           .contains("Usage: IndexBuilder <TABLE_NAME> <COLUMN_FAMILY> <ATTR> [<ATTR> ...]"));
+      } finally {
+        exitHandler.restore();
       }
     } finally {
       System.setErr(oldPrintStream);
